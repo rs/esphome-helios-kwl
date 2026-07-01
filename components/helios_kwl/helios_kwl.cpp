@@ -255,7 +255,11 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
   std::array<Datagram, 3> datagrams{};
   for (size_t i = 0; i < datagrams.size(); i++) {
     datagrams[i] = {SYSTEM, m_write_address, recipients[i], address, value};
-    datagrams[i][5] = checksum(datagrams[i].cbegin(), datagrams[i].cend());
+  }
+  // The physical DIGIT remote repeats the mainboard-frame checksum on every frame in the write burst.
+  const uint8_t write_checksum = checksum(datagrams[2].cbegin(), datagrams[2].cend());
+  for (auto& datagram : datagrams) {
+    datagram[5] = write_checksum;
   }
 
   ESP_LOGD(TAG, "Writing register 0x%02X to 0x%02X as terminal 0x%02X", static_cast<unsigned>(address),
