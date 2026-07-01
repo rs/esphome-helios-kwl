@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <numeric>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -16,6 +17,10 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   static constexpr uint8_t SYSTEM = 0x01;
   static constexpr uint8_t ADDRESS = 0x2F;
   static constexpr uint8_t MAINBOARD = 0x11;
+  static constexpr uint8_t REMOTE_BROADCAST = 0x20;
+  static constexpr uint8_t REMOTE_MIN = 0x21;
+  static constexpr uint8_t REMOTE_MAX = 0x2F;
+  static constexpr uint32_t REGISTER_CACHE_TTL_MS = 30000;
   static const int TEMPERATURE[];
 
  public:
@@ -56,6 +61,8 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
 
   bool read_datagram(Datagram& datagram, uint32_t timeout_ms);
   void flush_read_buffer();
+  bool cache_register_value(const Datagram& datagram);
+  optional<uint8_t> cached_register_value(uint8_t address) const;
 
   template <typename Iterator>
   static bool check_crc(const Iterator begin, const Iterator end) {
@@ -69,6 +76,9 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   }
 
   static uint8_t count_ones(uint8_t byte);
+  static bool is_remote_recipient(uint8_t recipient) {
+    return recipient == REMOTE_BROADCAST || (recipient >= REMOTE_MIN && recipient <= REMOTE_MAX);
+  }
 
  private:
   sensor::Sensor* m_fan_speed{nullptr};
@@ -88,6 +98,8 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   using PollerFunction = std::function<void()>;
   std::vector<PollerFunction> m_pollers{};
   std::vector<PollerFunction>::const_iterator m_current_poller{};
+  std::array<uint8_t, 256> m_register_cache{};
+  std::array<uint32_t, 256> m_register_cache_time{};
 };
 
 }  // namespace helios_kwl_component

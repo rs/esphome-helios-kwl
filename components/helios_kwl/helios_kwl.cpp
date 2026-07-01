@@ -170,6 +170,10 @@ void HeliosKwlComponent::poll_states() {
 optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
   // Flush read buffer
   flush_read_buffer();
+  if (const auto value = cached_register_value(address)) {
+    ESP_LOGV(TAG, "Using cached DIGIT value for register 0x%02X: 0x%02X", address, *value);
+    return *value;
+  }
 
   Datagram request = {SYSTEM, ADDRESS, MAINBOARD, 0x00, address};
   request[5] = checksum(request.cbegin(), request.cend());
@@ -210,7 +214,19 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
     }
 
     if (response[0] == SYSTEM && response[1] == MAINBOARD && response[2] == ADDRESS && response[3] == address) {
+      cache_register_value(response);
       return response[4];
+    }
+
+    // The original wall terminal can already be polling the mainboard. Keep those mainboard values
+    // as a read-only fallback when this extra terminal address is not answered directly.
+    if (cache_register_value(response)) {
+      if (response[3] == address) {
+        ESP_LOGV(TAG, "Using DIGIT value from shared bus frame for register 0x%02X: %s", address, hex.c_str());
+        return response[4];
+      }
+      ESP_LOGV(TAG, "Cached shared DIGIT bus frame: %s", hex.c_str());
+      continue;
     }
 
     // Other remotes can share the DIGIT bus, so valid unrelated frames are normal traffic.
@@ -264,14 +280,52 @@ bool HeliosKwlComponent::read_datagram(Datagram& datagram, uint32_t timeout_ms) 
 
 void HeliosKwlComponent::flush_read_buffer() {
   // Flush read buffer and wait for the bus to be quiet for 10 ms
+  Datagram datagram{};
+  size_t offset = 0;
   uint32_t last_time = millis();
   while (millis() - last_time < 10) {
     while (available()) {
-      read();
+      const int byte = read();
       last_time = millis();
+
+      if (byte < 0) {
+        break;
+      }
+
+      if (offset == 0 && byte != SYSTEM) {
+        continue;
+      }
+
+      datagram[offset++] = static_cast<uint8_t>(byte);
+      if (offset == datagram.size()) {
+        // Shared bus frames seen while draining the UART can still carry fresh register values.
+        cache_register_value(datagram);
+        offset = 0;
+      }
     }
     yield();
   }
+}
+
+bool HeliosKwlComponent::cache_register_value(const Datagram& datagram) {
+  if (!check_crc(datagram.cbegin(), datagram.cend())) {
+    return false;
+  }
+  if (datagram[0] != SYSTEM || datagram[1] != MAINBOARD || !is_remote_recipient(datagram[2])) {
+    return false;
+  }
+
+  m_register_cache[datagram[3]] = datagram[4];
+  m_register_cache_time[datagram[3]] = millis();
+  return true;
+}
+
+optional<uint8_t> HeliosKwlComponent::cached_register_value(uint8_t address) const {
+  const uint32_t cache_time = m_register_cache_time[address];
+  if (cache_time == 0 || millis() - cache_time > REGISTER_CACHE_TTL_MS) {
+    return {};
+  }
+  return m_register_cache[address];
 }
 
 uint8_t HeliosKwlComponent::count_ones(uint8_t byte) {
