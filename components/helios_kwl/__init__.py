@@ -9,10 +9,13 @@ DEPENDENCIES = ["uart"]
 helios_kwl_component_ns = cg.esphome_ns.namespace("helios_kwl_component")
 HeliosKwlComponent = helios_kwl_component_ns.class_("HeliosKwlComponent", cg.PollingComponent, uart.UARTDevice)
 SetFanSpeedAction = helios_kwl_component_ns.class_("SetFanSpeedAction", automation.Action)
+WriteRegisterAction = helios_kwl_component_ns.class_("WriteRegisterAction", automation.Action)
 
 CONF_HELIOS_KWL_ID = "helios_kwl_id"
+CONF_REGISTER = "register"
 CONF_LEVEL = "level"
 CONF_REPEAT_FINAL_CHECKSUM = "repeat_final_checksum"
+CONF_VALUE = "value"
 CONF_WRITE_ADDRESS = "write_address"
 CONF_WRITE_BUS_IDLE = "write_bus_idle"
 CONF_WRITE_CHECKSUM = "write_checksum"
@@ -67,4 +70,26 @@ async def set_fan_speed_to_code(config, action_id, template_arg, args):
     await cg.register_parented(var, config[CONF_ID])
     level = await cg.templatable(config[CONF_LEVEL], args, cg.uint8)
     cg.add(var.set_level(level))
+    return var
+
+
+@automation.register_action(
+    "helios_kwl.write_register",
+    WriteRegisterAction,
+    cv.Schema(
+        {
+            cv.Required(CONF_ID): cv.use_id(HeliosKwlComponent),
+            cv.Required(CONF_REGISTER): cv.templatable(cv.hex_uint8_t),
+            cv.Required(CONF_VALUE): cv.templatable(cv.hex_uint8_t),
+        }
+    ),
+    synchronous=True,
+)
+async def write_register_to_code(config, action_id, template_arg, args):
+    var = cg.new_Pvariable(action_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
+    register = await cg.templatable(config[CONF_REGISTER], args, cg.uint8)
+    value = await cg.templatable(config[CONF_VALUE], args, cg.uint8)
+    cg.add(var.set_address(register))
+    cg.add(var.set_value(value))
     return var

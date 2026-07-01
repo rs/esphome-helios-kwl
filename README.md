@@ -41,6 +41,16 @@ then:
       level: 5
 ```
 
+For protocol debugging or extra controls, a raw DIGIT register write action is also available:
+
+```yaml
+then:
+  - helios_kwl.write_register:
+      id: helios_kwl_0
+      register: 0x29
+      value: 0x1F
+```
+
 If writes are not accepted by the unit, `write_checksum` can switch between the physical-remote
 checksum style and the per-recipient checksum style documented by the protocol:
 

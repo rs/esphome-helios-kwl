@@ -287,6 +287,10 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
 
   ESP_LOGD(TAG, "Writing register 0x%02X to 0x%02X as terminal 0x%02X", static_cast<unsigned>(address),
            static_cast<unsigned>(value), static_cast<unsigned>(m_write_address));
+  ESP_LOGD(TAG, "Write burst frame 1: %s", format_hex_pretty(datagrams[0].data(), datagrams[0].size()).c_str());
+  ESP_LOGD(TAG, "Write burst frame 2: %s", format_hex_pretty(datagrams[1].data(), datagrams[1].size()).c_str());
+  ESP_LOGD(TAG, "Write burst frame 3: %s%s", format_hex_pretty(datagrams[2].data(), datagrams[2].size()).c_str(),
+           m_repeat_final_checksum ? " + repeated checksum" : "");
 
   for (uint8_t retry = 0; retry < 3; retry++) {
     // On a shared DIGIT bus the wall terminal may already be mid-poll. Wait for a quiet gap
@@ -370,8 +374,21 @@ bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t va
 
       datagram[offset++] = static_cast<uint8_t>(byte);
       if (offset == datagram.size()) {
-        if (cache_register_value(datagram) && datagram[3] == address && datagram[4] == value) {
-          return true;
+        const auto hex = format_hex_pretty(datagram.data(), datagram.size());
+        if (!check_crc(datagram.cbegin(), datagram.cend())) {
+          ESP_LOGD(TAG, "Ignoring write-side frame that is not a standard response: %s", hex.c_str());
+          offset = 0;
+          continue;
+        }
+
+        if (cache_register_value(datagram)) {
+          ESP_LOGD(TAG, "Observed mainboard frame while waiting for 0x%02X=0x%02X: %s",
+                   static_cast<unsigned>(address), static_cast<unsigned>(value), hex.c_str());
+          if (datagram[3] == address && datagram[4] == value) {
+            return true;
+          }
+        } else {
+          ESP_LOGD(TAG, "Ignoring unrelated write-side frame: %s", hex.c_str());
         }
         // Writes happen on a shared/echoing bus; only a valid register value frame confirms success.
         offset = 0;
