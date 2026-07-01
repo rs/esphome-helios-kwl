@@ -384,8 +384,9 @@ bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t va
     return true;
   }
   if (acknowledged) {
-    ESP_LOGD(TAG, "Write acknowledged for register 0x%02X", static_cast<unsigned>(address));
-    return true;
+    // A single checksum byte can be the mainboard ACK, but echoing adapters can also reflect the
+    // outgoing checksum. Treat it as diagnostic only until the register value is observed.
+    ESP_LOGD(TAG, "Write checksum byte observed for register 0x%02X", static_cast<unsigned>(address));
   }
   return false;
 }
