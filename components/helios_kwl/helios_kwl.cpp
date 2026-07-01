@@ -68,6 +68,7 @@ void HeliosKwlComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Helios KWL:");
   ESP_LOGCONFIG(TAG, "  Write address: 0x%02X", static_cast<unsigned>(m_write_address));
   ESP_LOGCONFIG(TAG, "  Write checksum: %s", m_use_mainboard_write_checksum ? "mainboard" : "recipient");
+  ESP_LOGCONFIG(TAG, "  Write frame delay: %" PRIu32 " ms", m_write_frame_delay_ms);
   LOG_SENSOR("  ", "Fan speed", m_fan_speed);
   LOG_SENSOR("  ", "Temperature outside", m_temperature_outside);
   LOG_SENSOR("  ", "Temperature exhaust", m_temperature_exhaust);
@@ -290,10 +291,14 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
 
     write_array(datagrams[0]);
     flush();
-    delay(2);
+    if (m_write_frame_delay_ms > 0) {
+      delay(m_write_frame_delay_ms);
+    }
     write_array(datagrams[1]);
     flush();
-    delay(2);
+    if (m_write_frame_delay_ms > 0) {
+      delay(m_write_frame_delay_ms);
+    }
     write_array(datagrams[2]);
     // Helios expects the final mainboard checksum byte twice for register writes.
     write_byte(datagrams[2][5]);

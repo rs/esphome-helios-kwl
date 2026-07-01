@@ -50,6 +50,15 @@ helios_kwl:
   write_checksum: recipient
 ```
 
+The write frames are separated by `2ms` by default. If a bus or adapter needs more settling time,
+this can be increased:
+
+```yaml
+helios_kwl:
+  id: helios_kwl_0
+  write_frame_delay: 10ms
+```
+
 ## Disclaimer
 
 As usual, I decline all responsibility if you break your Helios KWL (or anything else actually).

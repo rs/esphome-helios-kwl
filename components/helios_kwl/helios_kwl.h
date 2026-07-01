@@ -36,6 +36,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   void set_use_mainboard_write_checksum(bool use_mainboard_write_checksum) {
     m_use_mainboard_write_checksum = use_mainboard_write_checksum;
   }
+  void set_write_frame_delay_ms(uint32_t write_frame_delay_ms) { m_write_frame_delay_ms = write_frame_delay_ms; }
 
   void set_fan_speed(float speed);
   bool set_fan_speed_level(uint8_t level);
@@ -113,6 +114,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   uint32_t m_last_register_frame_time{0};
   uint8_t m_write_address{ADDRESS};
   bool m_use_mainboard_write_checksum{true};
+  uint32_t m_write_frame_delay_ms{2};
 };
 
 template<typename... Ts> class SetFanSpeedAction : public Action<Ts...>, public Parented<HeliosKwlComponent> {
