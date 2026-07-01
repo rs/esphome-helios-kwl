@@ -1,5 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
+from esphome import automation
 from esphome.components import uart
 from esphome.const import CONF_ID
 
@@ -7,8 +8,10 @@ DEPENDENCIES = ["uart"]
 
 helios_kwl_component_ns = cg.esphome_ns.namespace("helios_kwl_component")
 HeliosKwlComponent = helios_kwl_component_ns.class_("HeliosKwlComponent", cg.PollingComponent, uart.UARTDevice)
+SetFanSpeedAction = helios_kwl_component_ns.class_("SetFanSpeedAction", automation.Action)
 
 CONF_HELIOS_KWL_ID = "helios_kwl_id"
+CONF_LEVEL = "level"
 CONF_WRITE_ADDRESS = "write_address"
 
 
@@ -29,3 +32,22 @@ async def to_code(config):
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
     cg.add(var.set_write_address(config[CONF_WRITE_ADDRESS]))
+
+
+@automation.register_action(
+    "helios_kwl.set_fan_speed",
+    SetFanSpeedAction,
+    cv.Schema(
+        {
+            cv.Required(CONF_ID): cv.use_id(HeliosKwlComponent),
+            cv.Required(CONF_LEVEL): cv.templatable(cv.int_range(min=0, max=8)),
+        }
+    ),
+    synchronous=True,
+)
+async def set_fan_speed_to_code(config, action_id, template_arg, args):
+    var = cg.new_Pvariable(action_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
+    level = await cg.templatable(config[CONF_LEVEL], args, cg.uint8)
+    cg.add(var.set_level(level))
+    return var

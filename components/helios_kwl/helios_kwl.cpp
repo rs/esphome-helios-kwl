@@ -79,18 +79,31 @@ void HeliosKwlComponent::dump_config() {
 }
 
 void HeliosKwlComponent::set_fan_speed(float speed) {
-  if (speed == 0.f) {
+  assert(speed >= 0.f && speed <= 1.f);
+  const uint8_t level = speed >= 1.f ? 8 : static_cast<uint8_t>(speed * 8 + 0.5f);
+  set_fan_speed_level(level);
+}
+
+bool HeliosKwlComponent::set_fan_speed_level(uint8_t level) {
+  if (level == 0) {
     set_state_flag(0, false);
-  } else {
-    assert(speed >= 0.f && speed <= 8.f);
-    const uint8_t speed_byte = 0xFF >> (8 - static_cast<int>(speed * 8));
-    if (set_value(0x29, speed_byte)) {
-      ESP_LOGD(TAG, "Wrote speed: %02x", speed_byte);
-      set_state_flag(0, true);
-    } else {
-      ESP_LOGE(TAG, "Failed to set fan speed");
-    }
+    return true;
   }
+
+  if (level > 8) {
+    ESP_LOGW(TAG, "Invalid fan speed level: %u", static_cast<unsigned>(level));
+    return false;
+  }
+
+  const uint8_t speed_byte = fan_speed_byte(level);
+  if (set_value(0x29, speed_byte)) {
+    ESP_LOGD(TAG, "Wrote speed level %u as 0x%02X", static_cast<unsigned>(level), static_cast<unsigned>(speed_byte));
+    set_state_flag(0, true);
+    return true;
+  }
+
+  ESP_LOGE(TAG, "Failed to set fan speed level %u", static_cast<unsigned>(level));
+  return false;
 }
 
 void HeliosKwlComponent::set_state_flag(uint8_t bit, bool state) {
@@ -399,6 +412,11 @@ optional<uint8_t> HeliosKwlComponent::cached_register_value(uint8_t address) con
 uint8_t HeliosKwlComponent::count_ones(uint8_t byte) {
   static const uint8_t NIBBLE_LOOKUP[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
   return NIBBLE_LOOKUP[byte & 0x0F] + NIBBLE_LOOKUP[byte >> 4];
+}
+
+uint8_t HeliosKwlComponent::fan_speed_byte(uint8_t level) {
+  // DIGIT fan speeds are encoded as the lower N bits set: level 5 -> 0x1F.
+  return 0xFF >> (8 - level);
 }
 
 }  // namespace helios_kwl_component

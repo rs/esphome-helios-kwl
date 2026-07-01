@@ -7,6 +7,7 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/uart/uart.h"
+#include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 
 namespace esphome {
@@ -34,6 +35,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   void set_write_address(uint8_t write_address) { m_write_address = write_address; }
 
   void set_fan_speed(float speed);
+  bool set_fan_speed_level(uint8_t level);
   void set_state_flag(uint8_t bit, bool state);
 
   void set_fan_speed_sensor(sensor::Sensor* sensor) { m_fan_speed = sensor; }
@@ -80,6 +82,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   }
 
   static uint8_t count_ones(uint8_t byte);
+  static uint8_t fan_speed_byte(uint8_t level);
   static bool is_remote_recipient(uint8_t recipient) {
     return recipient == REMOTE_BROADCAST || (recipient >= REMOTE_MIN && recipient <= REMOTE_MAX);
   }
@@ -106,6 +109,13 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   std::array<uint32_t, 256> m_register_cache_time{};
   uint32_t m_last_register_frame_time{0};
   uint8_t m_write_address{ADDRESS};
+};
+
+template<typename... Ts> class SetFanSpeedAction : public Action<Ts...>, public Parented<HeliosKwlComponent> {
+ public:
+  TEMPLATABLE_VALUE(uint8_t, level)
+
+  void play(const Ts&... x) override { this->parent_->set_fan_speed_level(this->level_.value(x...)); }
 };
 
 }  // namespace helios_kwl_component

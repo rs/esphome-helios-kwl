@@ -32,6 +32,15 @@ external_components:
       ref: 2025.3.1
 ```
 
+The component also exposes an automation action for absolute fan speeds:
+
+```yaml
+then:
+  - helios_kwl.set_fan_speed:
+      id: helios_kwl_0
+      level: 5
+```
+
 ## Disclaimer
 
 As usual, I decline all responsibility if you break your Helios KWL (or anything else actually).
