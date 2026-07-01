@@ -42,6 +42,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
 
   void set_fan_speed(float speed);
   bool set_fan_speed_level(uint8_t level);
+  bool read_register(uint8_t address);
   bool write_register(uint8_t address, uint8_t value) { return set_value(address, value); }
   void set_state_flag(uint8_t bit, bool state);
 
@@ -67,7 +68,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   void poll_fan_speed();
   void poll_states();
 
-  optional<uint8_t> poll_register(uint8_t address);
+  optional<uint8_t> poll_register(uint8_t address, bool allow_shared_cache = true);
 
   bool set_value(uint8_t address, uint8_t value);
 
@@ -127,6 +128,13 @@ template<typename... Ts> class SetFanSpeedAction : public Action<Ts...>, public 
   TEMPLATABLE_VALUE(uint8_t, level)
 
   void play(const Ts&... x) override { this->parent_->set_fan_speed_level(this->level_.value(x...)); }
+};
+
+template<typename... Ts> class ReadRegisterAction : public Action<Ts...>, public Parented<HeliosKwlComponent> {
+ public:
+  TEMPLATABLE_VALUE(uint8_t, address)
+
+  void play(const Ts&... x) override { this->parent_->read_register(this->address_.value(x...)); }
 };
 
 template<typename... Ts> class WriteRegisterAction : public Action<Ts...>, public Parented<HeliosKwlComponent> {

@@ -45,6 +45,9 @@ For protocol debugging or extra controls, a raw DIGIT register write action is a
 
 ```yaml
 then:
+  - helios_kwl.read_register:
+      id: helios_kwl_0
+      register: 0x29
   - helios_kwl.write_register:
       id: helios_kwl_0
       register: 0x29

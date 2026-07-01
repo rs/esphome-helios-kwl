@@ -8,6 +8,7 @@ DEPENDENCIES = ["uart"]
 
 helios_kwl_component_ns = cg.esphome_ns.namespace("helios_kwl_component")
 HeliosKwlComponent = helios_kwl_component_ns.class_("HeliosKwlComponent", cg.PollingComponent, uart.UARTDevice)
+ReadRegisterAction = helios_kwl_component_ns.class_("ReadRegisterAction", automation.Action)
 SetFanSpeedAction = helios_kwl_component_ns.class_("SetFanSpeedAction", automation.Action)
 WriteRegisterAction = helios_kwl_component_ns.class_("WriteRegisterAction", automation.Action)
 
@@ -70,6 +71,25 @@ async def set_fan_speed_to_code(config, action_id, template_arg, args):
     await cg.register_parented(var, config[CONF_ID])
     level = await cg.templatable(config[CONF_LEVEL], args, cg.uint8)
     cg.add(var.set_level(level))
+    return var
+
+
+@automation.register_action(
+    "helios_kwl.read_register",
+    ReadRegisterAction,
+    cv.Schema(
+        {
+            cv.Required(CONF_ID): cv.use_id(HeliosKwlComponent),
+            cv.Required(CONF_REGISTER): cv.templatable(cv.hex_uint8_t),
+        }
+    ),
+    synchronous=True,
+)
+async def read_register_to_code(config, action_id, template_arg, args):
+    var = cg.new_Pvariable(action_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
+    register = await cg.templatable(config[CONF_REGISTER], args, cg.uint8)
+    cg.add(var.set_address(register))
     return var
 
 

@@ -110,6 +110,18 @@ bool HeliosKwlComponent::set_fan_speed_level(uint8_t level) {
   return false;
 }
 
+bool HeliosKwlComponent::read_register(uint8_t address) {
+  if (const auto value = poll_register(address, false)) {
+    ESP_LOGD(TAG, "Direct DIGIT read for register 0x%02X returned 0x%02X", static_cast<unsigned>(address),
+             static_cast<unsigned>(*value));
+    return true;
+  }
+
+  ESP_LOGW(TAG, "No direct DIGIT response for register 0x%02X at terminal 0x%02X", static_cast<unsigned>(address),
+           static_cast<unsigned>(ADDRESS));
+  return false;
+}
+
 void HeliosKwlComponent::set_state_flag(uint8_t bit, bool state) {
   if (auto value = poll_register(0xA3)) {
     if (state == ((*value >> bit) & 0x01)) {
@@ -185,13 +197,15 @@ void HeliosKwlComponent::poll_states() {
   }
 }
 
-optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
+optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address, bool allow_shared_cache) {
   // Flush read buffer
   flush_read_buffer();
-  if (const auto value = cached_register_value(address)) {
-    ESP_LOGV(TAG, "Using cached DIGIT value for register 0x%02X: 0x%02X", static_cast<unsigned>(address),
-             static_cast<unsigned>(*value));
-    return *value;
+  if (allow_shared_cache) {
+    if (const auto value = cached_register_value(address)) {
+      ESP_LOGV(TAG, "Using cached DIGIT value for register 0x%02X: 0x%02X", static_cast<unsigned>(address),
+               static_cast<unsigned>(*value));
+      return *value;
+    }
   }
 
   Datagram request = {SYSTEM, ADDRESS, MAINBOARD, 0x00, address};
@@ -241,6 +255,11 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
     // as a read-only fallback when this extra terminal address is not answered directly.
     if (cache_register_value(response)) {
       if (response[3] == address) {
+        if (!allow_shared_cache) {
+          ESP_LOGV(TAG, "Ignoring shared DIGIT bus value while waiting for direct register 0x%02X response: %s",
+                   static_cast<unsigned>(address), hex.c_str());
+          continue;
+        }
         ESP_LOGV(TAG, "Using DIGIT value from shared bus frame for register 0x%02X: %s",
                  static_cast<unsigned>(address), hex.c_str());
         return response[4];
@@ -254,7 +273,11 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
   }
 
   if (m_last_register_frame_time != 0 && millis() - m_last_register_frame_time <= REGISTER_CACHE_TTL_MS) {
-    ESP_LOGD(TAG, "No fresh shared DIGIT value for register 0x%02X", static_cast<unsigned>(address));
+    if (allow_shared_cache) {
+      ESP_LOGD(TAG, "No fresh shared DIGIT value for register 0x%02X", static_cast<unsigned>(address));
+    } else {
+      ESP_LOGD(TAG, "No direct DIGIT response for register 0x%02X", static_cast<unsigned>(address));
+    }
   } else {
     ESP_LOGW(TAG, "No valid response for register 0x%02X", static_cast<unsigned>(address));
   }
