@@ -50,6 +50,16 @@ helios_kwl:
   write_checksum: recipient
 ```
 
+Some installations show the final write checksum twice because the mainboard acknowledges the
+last addressed frame with a single checksum byte. To let the mainboard provide that byte instead
+of transmitting it locally:
+
+```yaml
+helios_kwl:
+  id: helios_kwl_0
+  repeat_final_checksum: false
+```
+
 The write frames are separated by `2ms` by default. If a bus or adapter needs more settling time,
 this can be increased:
 

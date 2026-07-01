@@ -66,6 +66,7 @@ void HeliosKwlComponent::update() {
 
 void HeliosKwlComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Helios KWL:");
+  ESP_LOGCONFIG(TAG, "  Repeat final checksum: %s", YESNO(m_repeat_final_checksum));
   ESP_LOGCONFIG(TAG, "  Write address: 0x%02X", static_cast<unsigned>(m_write_address));
   ESP_LOGCONFIG(TAG, "  Write checksum: %s", m_use_mainboard_write_checksum ? "mainboard" : "recipient");
   ESP_LOGCONFIG(TAG, "  Write bus idle: %" PRIu32 " ms", m_write_bus_idle_ms);
@@ -306,11 +307,13 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
       delay(m_write_frame_delay_ms);
     }
     write_array(datagrams[2]);
-    // Helios expects the final mainboard checksum byte twice for register writes.
-    write_byte(datagrams[2][5]);
+    // Some traces show the final checksum twice. In ACK mode the second byte is sent by the mainboard.
+    if (m_repeat_final_checksum) {
+      write_byte(datagrams[2][5]);
+    }
     flush();
 
-    if (wait_for_write_confirmation(address, value, 20)) {
+    if (wait_for_write_confirmation(address, value, datagrams[2][5], 20)) {
       return true;
     }
   }
@@ -343,9 +346,11 @@ bool HeliosKwlComponent::read_datagram(Datagram& datagram, uint32_t timeout_ms) 
   return false;
 }
 
-bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t value, uint32_t timeout_ms) {
+bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t value, uint8_t acknowledge,
+                                                     uint32_t timeout_ms) {
   Datagram datagram{};
   size_t offset = 0;
+  bool acknowledged = false;
   const uint32_t start_time = millis();
   while (millis() - start_time < timeout_ms) {
     while (available()) {
@@ -355,6 +360,11 @@ bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t va
       }
 
       if (offset == 0 && byte != SYSTEM) {
+        if (byte == acknowledge) {
+          acknowledged = true;
+          ESP_LOGV(TAG, "Received write checksum acknowledgment 0x%02X for register 0x%02X",
+                   static_cast<unsigned>(acknowledge), static_cast<unsigned>(address));
+        }
         continue;
       }
 
@@ -371,6 +381,10 @@ bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t va
   }
 
   if (const auto cached = cached_register_value(address); cached && *cached == value) {
+    return true;
+  }
+  if (acknowledged) {
+    ESP_LOGD(TAG, "Write acknowledged for register 0x%02X", static_cast<unsigned>(address));
     return true;
   }
   return false;
