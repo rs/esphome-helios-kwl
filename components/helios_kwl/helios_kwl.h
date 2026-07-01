@@ -17,6 +17,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   static constexpr uint8_t SYSTEM = 0x01;
   static constexpr uint8_t ADDRESS = 0x2F;
   static constexpr uint8_t MAINBOARD = 0x11;
+  static constexpr uint8_t MAINBOARD_BROADCAST = 0x10;
   static constexpr uint8_t REMOTE_BROADCAST = 0x20;
   static constexpr uint8_t REMOTE_MIN = 0x21;
   static constexpr uint8_t REMOTE_MAX = 0x2F;
@@ -60,6 +61,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   bool set_value(uint8_t address, uint8_t value);
 
   bool read_datagram(Datagram& datagram, uint32_t timeout_ms);
+  bool wait_for_write_confirmation(uint8_t address, uint8_t value, uint8_t ack, uint32_t timeout_ms);
   void flush_read_buffer();
   bool cache_register_value(const Datagram& datagram);
   optional<uint8_t> cached_register_value(uint8_t address) const;

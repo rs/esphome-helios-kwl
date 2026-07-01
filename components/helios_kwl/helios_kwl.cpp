@@ -238,20 +238,39 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
 }
 
 bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
-  Datagram temp = {0x01, ADDRESS, MAINBOARD, address, value};
-  temp[5] = checksum(temp.cbegin(), temp.cend());
+  if (const auto cached = cached_register_value(address); cached && *cached == value) {
+    ESP_LOGD(TAG, "Register 0x%02X already has value 0x%02X", address, value);
+    return true;
+  }
 
-  // To the mainboard
-  int retry = 3;
-  do {
-    // Flush read buffer
+  const std::array<uint8_t, 3> recipients = {REMOTE_BROADCAST, MAINBOARD_BROADCAST, MAINBOARD};
+  std::array<Datagram, 3> datagrams{};
+  for (size_t i = 0; i < datagrams.size(); i++) {
+    datagrams[i] = {SYSTEM, ADDRESS, recipients[i], address, value};
+    datagrams[i][5] = checksum(datagrams[i].cbegin(), datagrams[i].cend());
+  }
+
+  for (uint8_t retry = 0; retry < 10; retry++) {
     flush_read_buffer();
-    // Write
-    write_array(temp);
-    flush();
-  } while (read() != temp[5] && retry-- > 0);
 
-  return retry >= 0;
+    write_array(datagrams[0]);
+    flush();
+    delay(2);
+    write_array(datagrams[1]);
+    flush();
+    delay(2);
+    write_array(datagrams[2]);
+    // Helios expects the final mainboard checksum byte twice for register writes.
+    write_byte(datagrams[2][5]);
+    flush();
+
+    if (wait_for_write_confirmation(address, value, datagrams[2][5], 10)) {
+      return true;
+    }
+  }
+
+  ESP_LOGW(TAG, "No write confirmation for register 0x%02X", address);
+  return false;
 }
 
 bool HeliosKwlComponent::read_datagram(Datagram& datagram, uint32_t timeout_ms) {
@@ -274,6 +293,45 @@ bool HeliosKwlComponent::read_datagram(Datagram& datagram, uint32_t timeout_ms) 
       }
     }
     yield();
+  }
+  return false;
+}
+
+bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t value, uint8_t ack, uint32_t timeout_ms) {
+  Datagram datagram{};
+  size_t offset = 0;
+  const uint32_t start_time = millis();
+  while (millis() - start_time < timeout_ms) {
+    while (available()) {
+      const int byte = read();
+      if (byte < 0) {
+        break;
+      }
+
+      if (static_cast<uint8_t>(byte) == ack) {
+        m_register_cache[address] = value;
+        m_register_cache_time[address] = millis();
+        return true;
+      }
+
+      if (offset == 0 && byte != SYSTEM) {
+        continue;
+      }
+
+      datagram[offset++] = static_cast<uint8_t>(byte);
+      if (offset == datagram.size()) {
+        if (cache_register_value(datagram) && datagram[3] == address && datagram[4] == value) {
+          return true;
+        }
+        // Writes happen on a shared bus, so unrelated valid frames can arrive before confirmation.
+        offset = 0;
+      }
+    }
+    yield();
+  }
+
+  if (const auto cached = cached_register_value(address); cached && *cached == value) {
+    return true;
   }
   return false;
 }
