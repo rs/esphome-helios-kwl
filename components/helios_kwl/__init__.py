@@ -13,6 +13,12 @@ SetFanSpeedAction = helios_kwl_component_ns.class_("SetFanSpeedAction", automati
 CONF_HELIOS_KWL_ID = "helios_kwl_id"
 CONF_LEVEL = "level"
 CONF_WRITE_ADDRESS = "write_address"
+CONF_WRITE_CHECKSUM = "write_checksum"
+
+WRITE_CHECKSUM_MODES = {
+    "mainboard": True,
+    "recipient": False,
+}
 
 
 HELIOS_KWL_COMPONENT_SCHEMA = cv.Schema({cv.Required(CONF_HELIOS_KWL_ID): cv.use_id(HeliosKwlComponent)})
@@ -21,6 +27,7 @@ CONFIG_SCHEMA = (
     cv.Schema({
         cv.GenerateID(): cv.declare_id(HeliosKwlComponent),
         cv.Optional(CONF_WRITE_ADDRESS, default=0x2F): cv.hex_uint8_t,
+        cv.Optional(CONF_WRITE_CHECKSUM, default="mainboard"): cv.enum(WRITE_CHECKSUM_MODES, lower=True),
     })
     .extend(cv.polling_component_schema("2s"))
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -32,6 +39,7 @@ async def to_code(config):
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
     cg.add(var.set_write_address(config[CONF_WRITE_ADDRESS]))
+    cg.add(var.set_use_mainboard_write_checksum(config[CONF_WRITE_CHECKSUM]))
 
 
 @automation.register_action(

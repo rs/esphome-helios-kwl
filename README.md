@@ -41,6 +41,15 @@ then:
       level: 5
 ```
 
+If writes are not accepted by the unit, `write_checksum` can switch between the physical-remote
+checksum style and the per-recipient checksum style documented by the protocol:
+
+```yaml
+helios_kwl:
+  id: helios_kwl_0
+  write_checksum: recipient
+```
+
 ## Disclaimer
 
 As usual, I decline all responsibility if you break your Helios KWL (or anything else actually).

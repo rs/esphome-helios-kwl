@@ -67,6 +67,7 @@ void HeliosKwlComponent::update() {
 void HeliosKwlComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Helios KWL:");
   ESP_LOGCONFIG(TAG, "  Write address: 0x%02X", static_cast<unsigned>(m_write_address));
+  ESP_LOGCONFIG(TAG, "  Write checksum: %s", m_use_mainboard_write_checksum ? "mainboard" : "recipient");
   LOG_SENSOR("  ", "Fan speed", m_fan_speed);
   LOG_SENSOR("  ", "Temperature outside", m_temperature_outside);
   LOG_SENSOR("  ", "Temperature exhaust", m_temperature_exhaust);
@@ -269,10 +270,16 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
   for (size_t i = 0; i < datagrams.size(); i++) {
     datagrams[i] = {SYSTEM, m_write_address, recipients[i], address, value};
   }
-  // The physical DIGIT remote repeats the mainboard-frame checksum on every frame in the write burst.
-  const uint8_t write_checksum = checksum(datagrams[2].cbegin(), datagrams[2].cend());
-  for (auto& datagram : datagrams) {
-    datagram[5] = write_checksum;
+  if (m_use_mainboard_write_checksum) {
+    // Some physical DIGIT remotes repeat the mainboard-frame checksum on every frame in the write burst.
+    const uint8_t write_checksum = checksum(datagrams[2].cbegin(), datagrams[2].cend());
+    for (auto& datagram : datagrams) {
+      datagram[5] = write_checksum;
+    }
+  } else {
+    for (auto& datagram : datagrams) {
+      datagram[5] = checksum(datagram.cbegin(), datagram.cend());
+    }
   }
 
   ESP_LOGD(TAG, "Writing register 0x%02X to 0x%02X as terminal 0x%02X", static_cast<unsigned>(address),

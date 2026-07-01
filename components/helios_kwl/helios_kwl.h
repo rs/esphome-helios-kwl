@@ -33,6 +33,9 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   void dump_config() override;
 
   void set_write_address(uint8_t write_address) { m_write_address = write_address; }
+  void set_use_mainboard_write_checksum(bool use_mainboard_write_checksum) {
+    m_use_mainboard_write_checksum = use_mainboard_write_checksum;
+  }
 
   void set_fan_speed(float speed);
   bool set_fan_speed_level(uint8_t level);
@@ -109,6 +112,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   std::array<uint32_t, 256> m_register_cache_time{};
   uint32_t m_last_register_frame_time{0};
   uint8_t m_write_address{ADDRESS};
+  bool m_use_mainboard_write_checksum{true};
 };
 
 template<typename... Ts> class SetFanSpeedAction : public Action<Ts...>, public Parented<HeliosKwlComponent> {
