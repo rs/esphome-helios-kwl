@@ -61,7 +61,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   bool set_value(uint8_t address, uint8_t value);
 
   bool read_datagram(Datagram& datagram, uint32_t timeout_ms);
-  bool wait_for_write_confirmation(uint8_t address, uint8_t value, uint8_t ack, uint32_t timeout_ms);
+  bool wait_for_write_confirmation(uint8_t address, uint8_t value, uint32_t timeout_ms);
   void flush_read_buffer();
   bool cache_register_value(const Datagram& datagram);
   optional<uint8_t> cached_register_value(uint8_t address) const;

@@ -250,7 +250,7 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
     datagrams[i][5] = checksum(datagrams[i].cbegin(), datagrams[i].cend());
   }
 
-  for (uint8_t retry = 0; retry < 10; retry++) {
+  for (uint8_t retry = 0; retry < 3; retry++) {
     flush_read_buffer();
 
     write_array(datagrams[0]);
@@ -264,7 +264,7 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
     write_byte(datagrams[2][5]);
     flush();
 
-    if (wait_for_write_confirmation(address, value, datagrams[2][5], 10)) {
+    if (wait_for_write_confirmation(address, value, 20)) {
       return true;
     }
   }
@@ -297,7 +297,7 @@ bool HeliosKwlComponent::read_datagram(Datagram& datagram, uint32_t timeout_ms) 
   return false;
 }
 
-bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t value, uint8_t ack, uint32_t timeout_ms) {
+bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t value, uint32_t timeout_ms) {
   Datagram datagram{};
   size_t offset = 0;
   const uint32_t start_time = millis();
@@ -306,12 +306,6 @@ bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t va
       const int byte = read();
       if (byte < 0) {
         break;
-      }
-
-      if (static_cast<uint8_t>(byte) == ack) {
-        m_register_cache[address] = value;
-        m_register_cache_time[address] = millis();
-        return true;
       }
 
       if (offset == 0 && byte != SYSTEM) {
@@ -323,7 +317,7 @@ bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t va
         if (cache_register_value(datagram) && datagram[3] == address && datagram[4] == value) {
           return true;
         }
-        // Writes happen on a shared bus, so unrelated valid frames can arrive before confirmation.
+        // Writes happen on a shared/echoing bus; only a valid register value frame confirms success.
         offset = 0;
       }
     }
