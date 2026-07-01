@@ -66,7 +66,7 @@ void HeliosKwlComponent::update() {
 
 void HeliosKwlComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Helios KWL:");
-  ESP_LOGCONFIG(TAG, "  Write address: 0x%02X", m_write_address);
+  ESP_LOGCONFIG(TAG, "  Write address: 0x%02X", static_cast<unsigned>(m_write_address));
   LOG_SENSOR("  ", "Fan speed", m_fan_speed);
   LOG_SENSOR("  ", "Temperature outside", m_temperature_outside);
   LOG_SENSOR("  ", "Temperature exhaust", m_temperature_exhaust);
@@ -172,7 +172,8 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
   // Flush read buffer
   flush_read_buffer();
   if (const auto value = cached_register_value(address)) {
-    ESP_LOGV(TAG, "Using cached DIGIT value for register 0x%02X: 0x%02X", address, *value);
+    ESP_LOGV(TAG, "Using cached DIGIT value for register 0x%02X: 0x%02X", static_cast<unsigned>(address),
+             static_cast<unsigned>(*value));
     return *value;
   }
 
@@ -210,7 +211,7 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
 
     // Some RS485 adapters echo TX back to RX; it is not a mainboard response.
     if (response == request) {
-      ESP_LOGV(TAG, "Ignoring local echo for register 0x%02X: %s", address, hex.c_str());
+      ESP_LOGV(TAG, "Ignoring local echo for register 0x%02X: %s", static_cast<unsigned>(address), hex.c_str());
       continue;
     }
 
@@ -223,7 +224,8 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
     // as a read-only fallback when this extra terminal address is not answered directly.
     if (cache_register_value(response)) {
       if (response[3] == address) {
-        ESP_LOGV(TAG, "Using DIGIT value from shared bus frame for register 0x%02X: %s", address, hex.c_str());
+        ESP_LOGV(TAG, "Using DIGIT value from shared bus frame for register 0x%02X: %s",
+                 static_cast<unsigned>(address), hex.c_str());
         return response[4];
       }
       ESP_LOGV(TAG, "Cached shared DIGIT bus frame: %s", hex.c_str());
@@ -235,16 +237,17 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
   }
 
   if (m_last_register_frame_time != 0 && millis() - m_last_register_frame_time <= REGISTER_CACHE_TTL_MS) {
-    ESP_LOGD(TAG, "No fresh shared DIGIT value for register 0x%02X", address);
+    ESP_LOGD(TAG, "No fresh shared DIGIT value for register 0x%02X", static_cast<unsigned>(address));
   } else {
-    ESP_LOGW(TAG, "No valid response for register 0x%02X", address);
+    ESP_LOGW(TAG, "No valid response for register 0x%02X", static_cast<unsigned>(address));
   }
   return {};
 }
 
 bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
   if (const auto cached = cached_register_value(address); cached && *cached == value) {
-    ESP_LOGD(TAG, "Register 0x%02X already has value 0x%02X", address, value);
+    ESP_LOGD(TAG, "Register 0x%02X already has value 0x%02X", static_cast<unsigned>(address),
+             static_cast<unsigned>(value));
     return true;
   }
 
@@ -255,7 +258,8 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
     datagrams[i][5] = checksum(datagrams[i].cbegin(), datagrams[i].cend());
   }
 
-  ESP_LOGD(TAG, "Writing register 0x%02X to 0x%02X as terminal 0x%02X", address, value, m_write_address);
+  ESP_LOGD(TAG, "Writing register 0x%02X to 0x%02X as terminal 0x%02X", static_cast<unsigned>(address),
+           static_cast<unsigned>(value), static_cast<unsigned>(m_write_address));
 
   for (uint8_t retry = 0; retry < 3; retry++) {
     flush_read_buffer();
@@ -276,7 +280,7 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
     }
   }
 
-  ESP_LOGW(TAG, "No write confirmation for register 0x%02X", address);
+  ESP_LOGW(TAG, "No write confirmation for register 0x%02X", static_cast<unsigned>(address));
   return false;
 }
 
