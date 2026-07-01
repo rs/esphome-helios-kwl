@@ -13,6 +13,7 @@ SetFanSpeedAction = helios_kwl_component_ns.class_("SetFanSpeedAction", automati
 CONF_HELIOS_KWL_ID = "helios_kwl_id"
 CONF_LEVEL = "level"
 CONF_WRITE_ADDRESS = "write_address"
+CONF_WRITE_BUS_IDLE = "write_bus_idle"
 CONF_WRITE_CHECKSUM = "write_checksum"
 CONF_WRITE_FRAME_DELAY = "write_frame_delay"
 
@@ -28,6 +29,7 @@ CONFIG_SCHEMA = (
     cv.Schema({
         cv.GenerateID(): cv.declare_id(HeliosKwlComponent),
         cv.Optional(CONF_WRITE_ADDRESS, default=0x2F): cv.hex_uint8_t,
+        cv.Optional(CONF_WRITE_BUS_IDLE, default="30ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_WRITE_CHECKSUM, default="mainboard"): cv.enum(WRITE_CHECKSUM_MODES, lower=True),
         cv.Optional(CONF_WRITE_FRAME_DELAY, default="2ms"): cv.positive_time_period_milliseconds,
     })
@@ -41,6 +43,7 @@ async def to_code(config):
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
     cg.add(var.set_write_address(config[CONF_WRITE_ADDRESS]))
+    cg.add(var.set_write_bus_idle_ms(config[CONF_WRITE_BUS_IDLE].total_milliseconds))
     cg.add(var.set_use_mainboard_write_checksum(config[CONF_WRITE_CHECKSUM]))
     cg.add(var.set_write_frame_delay_ms(config[CONF_WRITE_FRAME_DELAY].total_milliseconds))
 

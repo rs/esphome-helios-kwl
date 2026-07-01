@@ -36,6 +36,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   void set_use_mainboard_write_checksum(bool use_mainboard_write_checksum) {
     m_use_mainboard_write_checksum = use_mainboard_write_checksum;
   }
+  void set_write_bus_idle_ms(uint32_t write_bus_idle_ms) { m_write_bus_idle_ms = write_bus_idle_ms; }
   void set_write_frame_delay_ms(uint32_t write_frame_delay_ms) { m_write_frame_delay_ms = write_frame_delay_ms; }
 
   void set_fan_speed(float speed);
@@ -70,7 +71,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
 
   bool read_datagram(Datagram& datagram, uint32_t timeout_ms);
   bool wait_for_write_confirmation(uint8_t address, uint8_t value, uint32_t timeout_ms);
-  void flush_read_buffer();
+  bool flush_read_buffer(uint32_t idle_ms = 10, uint32_t timeout_ms = 250);
   bool cache_register_value(const Datagram& datagram);
   optional<uint8_t> cached_register_value(uint8_t address) const;
 
@@ -114,6 +115,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   uint32_t m_last_register_frame_time{0};
   uint8_t m_write_address{ADDRESS};
   bool m_use_mainboard_write_checksum{true};
+  uint32_t m_write_bus_idle_ms{30};
   uint32_t m_write_frame_delay_ms{2};
 };
 

@@ -68,6 +68,7 @@ void HeliosKwlComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Helios KWL:");
   ESP_LOGCONFIG(TAG, "  Write address: 0x%02X", static_cast<unsigned>(m_write_address));
   ESP_LOGCONFIG(TAG, "  Write checksum: %s", m_use_mainboard_write_checksum ? "mainboard" : "recipient");
+  ESP_LOGCONFIG(TAG, "  Write bus idle: %" PRIu32 " ms", m_write_bus_idle_ms);
   ESP_LOGCONFIG(TAG, "  Write frame delay: %" PRIu32 " ms", m_write_frame_delay_ms);
   LOG_SENSOR("  ", "Fan speed", m_fan_speed);
   LOG_SENSOR("  ", "Temperature outside", m_temperature_outside);
@@ -287,7 +288,12 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
            static_cast<unsigned>(value), static_cast<unsigned>(m_write_address));
 
   for (uint8_t retry = 0; retry < 3; retry++) {
-    flush_read_buffer();
+    // On a shared DIGIT bus the wall terminal may already be mid-poll. Wait for a quiet gap
+    // before transmitting so our write burst does not collide with normal bus traffic.
+    if (!flush_read_buffer(m_write_bus_idle_ms, 250)) {
+      ESP_LOGV(TAG, "DIGIT bus did not become idle before write retry %u", static_cast<unsigned>(retry + 1));
+      continue;
+    }
 
     write_array(datagrams[0]);
     flush();
@@ -370,12 +376,17 @@ bool HeliosKwlComponent::wait_for_write_confirmation(uint8_t address, uint8_t va
   return false;
 }
 
-void HeliosKwlComponent::flush_read_buffer() {
-  // Flush read buffer and wait for the bus to be quiet for 10 ms
+bool HeliosKwlComponent::flush_read_buffer(uint32_t idle_ms, uint32_t timeout_ms) {
+  // Flush read buffer and wait for the bus to be quiet.
   Datagram datagram{};
   size_t offset = 0;
+  const uint32_t start_time = millis();
   uint32_t last_time = millis();
-  while (millis() - last_time < 10) {
+  while (millis() - last_time < idle_ms) {
+    if (millis() - start_time >= timeout_ms) {
+      return false;
+    }
+
     while (available()) {
       const int byte = read();
       last_time = millis();
@@ -397,6 +408,7 @@ void HeliosKwlComponent::flush_read_buffer() {
     }
     yield();
   }
+  return true;
 }
 
 bool HeliosKwlComponent::cache_register_value(const Datagram& datagram) {

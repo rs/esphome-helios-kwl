@@ -56,6 +56,7 @@ this can be increased:
 ```yaml
 helios_kwl:
   id: helios_kwl_0
+  write_bus_idle: 30ms
   write_frame_delay: 10ms
 ```
 
