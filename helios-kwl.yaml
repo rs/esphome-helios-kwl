@@ -41,6 +41,7 @@ uart:
 
 helios_kwl:
   id: helios_kwl_0
+  # write_address: 0x21
 
 sensor:
   - platform: wifi_signal

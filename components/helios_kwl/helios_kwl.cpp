@@ -66,6 +66,7 @@ void HeliosKwlComponent::update() {
 
 void HeliosKwlComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Helios KWL:");
+  ESP_LOGCONFIG(TAG, "  Write address: 0x%02X", m_write_address);
   LOG_SENSOR("  ", "Fan speed", m_fan_speed);
   LOG_SENSOR("  ", "Temperature outside", m_temperature_outside);
   LOG_SENSOR("  ", "Temperature exhaust", m_temperature_exhaust);
@@ -250,9 +251,11 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
   const std::array<uint8_t, 3> recipients = {REMOTE_BROADCAST, MAINBOARD_BROADCAST, MAINBOARD};
   std::array<Datagram, 3> datagrams{};
   for (size_t i = 0; i < datagrams.size(); i++) {
-    datagrams[i] = {SYSTEM, ADDRESS, recipients[i], address, value};
+    datagrams[i] = {SYSTEM, m_write_address, recipients[i], address, value};
     datagrams[i][5] = checksum(datagrams[i].cbegin(), datagrams[i].cend());
   }
+
+  ESP_LOGD(TAG, "Writing register 0x%02X to 0x%02X as terminal 0x%02X", address, value, m_write_address);
 
   for (uint8_t retry = 0; retry < 3; retry++) {
     flush_read_buffer();

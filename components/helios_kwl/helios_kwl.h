@@ -31,6 +31,8 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   void update() override;
   void dump_config() override;
 
+  void set_write_address(uint8_t write_address) { m_write_address = write_address; }
+
   void set_fan_speed(float speed);
   void set_state_flag(uint8_t bit, bool state);
 
@@ -103,6 +105,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   std::array<uint8_t, 256> m_register_cache{};
   std::array<uint32_t, 256> m_register_cache_time{};
   uint32_t m_last_register_frame_time{0};
+  uint8_t m_write_address{ADDRESS};
 };
 
 }  // namespace helios_kwl_component
