@@ -32,6 +32,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   void update() override;
   void dump_config() override;
 
+  void set_passive(bool passive) { m_passive = passive; }
   void set_repeat_final_checksum(bool repeat_final_checksum) { m_repeat_final_checksum = repeat_final_checksum; }
   void set_write_address(uint8_t write_address) { m_write_address = write_address; }
   void set_use_mainboard_write_checksum(bool use_mainboard_write_checksum) {
@@ -116,6 +117,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   std::array<uint8_t, 256> m_register_cache{};
   std::array<uint32_t, 256> m_register_cache_time{};
   uint32_t m_last_register_frame_time{0};
+  bool m_passive{false};
   bool m_repeat_final_checksum{true};
   uint8_t m_write_address{ADDRESS};
   bool m_use_mainboard_write_checksum{true};

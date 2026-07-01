@@ -13,8 +13,9 @@ SetFanSpeedAction = helios_kwl_component_ns.class_("SetFanSpeedAction", automati
 WriteRegisterAction = helios_kwl_component_ns.class_("WriteRegisterAction", automation.Action)
 
 CONF_HELIOS_KWL_ID = "helios_kwl_id"
-CONF_REGISTER = "register"
 CONF_LEVEL = "level"
+CONF_PASSIVE = "passive"
+CONF_REGISTER = "register"
 CONF_REPEAT_FINAL_CHECKSUM = "repeat_final_checksum"
 CONF_VALUE = "value"
 CONF_WRITE_ADDRESS = "write_address"
@@ -33,6 +34,7 @@ HELIOS_KWL_COMPONENT_SCHEMA = cv.Schema({cv.Required(CONF_HELIOS_KWL_ID): cv.use
 CONFIG_SCHEMA = (
     cv.Schema({
         cv.GenerateID(): cv.declare_id(HeliosKwlComponent),
+        cv.Optional(CONF_PASSIVE, default=False): cv.boolean,
         cv.Optional(CONF_REPEAT_FINAL_CHECKSUM, default=True): cv.boolean,
         cv.Optional(CONF_WRITE_ADDRESS, default=0x2F): cv.hex_uint8_t,
         cv.Optional(CONF_WRITE_BUS_IDLE, default="30ms"): cv.positive_time_period_milliseconds,
@@ -48,6 +50,7 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
+    cg.add(var.set_passive(config[CONF_PASSIVE]))
     cg.add(var.set_repeat_final_checksum(config[CONF_REPEAT_FINAL_CHECKSUM]))
     cg.add(var.set_write_address(config[CONF_WRITE_ADDRESS]))
     cg.add(var.set_write_bus_idle_ms(config[CONF_WRITE_BUS_IDLE].total_milliseconds))

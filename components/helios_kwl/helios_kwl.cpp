@@ -66,6 +66,7 @@ void HeliosKwlComponent::update() {
 
 void HeliosKwlComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Helios KWL:");
+  ESP_LOGCONFIG(TAG, "  Passive reads: %s", YESNO(m_passive));
   ESP_LOGCONFIG(TAG, "  Repeat final checksum: %s", YESNO(m_repeat_final_checksum));
   ESP_LOGCONFIG(TAG, "  Write address: 0x%02X", static_cast<unsigned>(m_write_address));
   ESP_LOGCONFIG(TAG, "  Write checksum: %s", m_use_mainboard_write_checksum ? "mainboard" : "recipient");
@@ -214,6 +215,44 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address, bool allow_
   const uint32_t timeout_ms = 100;
   const uint32_t request_retry_ms = 10;
   const uint32_t start_time = millis();
+  if (m_passive && allow_shared_cache) {
+    while (millis() - start_time < timeout_ms) {
+      Datagram response{};
+      const uint32_t elapsed_ms = millis() - start_time;
+      if (elapsed_ms >= timeout_ms) {
+        continue;
+      }
+      const uint32_t remaining_ms = timeout_ms - elapsed_ms;
+      const uint32_t wait_ms = remaining_ms < request_retry_ms ? remaining_ms : request_retry_ms;
+      if (!read_datagram(response, wait_ms)) {
+        continue;
+      }
+
+      const auto hex = format_hex_pretty(response.data(), response.size());
+      if (!check_crc(response.cbegin(), response.cend())) {
+        ESP_LOGV(TAG, "Ignoring DIGIT frame with bad checksum: %s", hex.c_str());
+        continue;
+      }
+
+      // In passive mode this component is a listener on a shared bus. The wall terminal
+      // and mainboard provide the register values; the ESP does not transmit read requests.
+      if (cache_register_value(response)) {
+        if (response[3] == address) {
+          ESP_LOGV(TAG, "Using passive DIGIT value for register 0x%02X: %s", static_cast<unsigned>(address),
+                   hex.c_str());
+          return response[4];
+        }
+        ESP_LOGV(TAG, "Cached passive DIGIT bus frame: %s", hex.c_str());
+        continue;
+      }
+
+      ESP_LOGV(TAG, "Ignoring unrelated DIGIT frame: %s", hex.c_str());
+    }
+
+    ESP_LOGD(TAG, "No passive DIGIT value for register 0x%02X", static_cast<unsigned>(address));
+    return {};
+  }
+
   uint32_t last_request_time = start_time - request_retry_ms;
   while (millis() - start_time < timeout_ms) {
     if (millis() - last_request_time >= request_retry_ms) {

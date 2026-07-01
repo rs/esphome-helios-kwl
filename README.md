@@ -41,6 +41,15 @@ then:
       level: 5
 ```
 
+On a shared DIGIT bus where the original wall terminal remains connected, the component can run
+as a passive listener and publish values from mainboard frames already present on the bus:
+
+```yaml
+helios_kwl:
+  id: helios_kwl_0
+  passive: true
+```
+
 For protocol debugging or extra controls, a raw DIGIT register write action is also available:
 
 ```yaml
