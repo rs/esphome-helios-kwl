@@ -21,7 +21,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   static constexpr uint8_t REMOTE_BROADCAST = 0x20;
   static constexpr uint8_t REMOTE_MIN = 0x21;
   static constexpr uint8_t REMOTE_MAX = 0x2F;
-  static constexpr uint32_t REGISTER_CACHE_TTL_MS = 30000;
+  static constexpr uint32_t REGISTER_CACHE_TTL_MS = 120000;
   static const int TEMPERATURE[];
 
  public:
@@ -102,6 +102,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
   std::vector<PollerFunction>::const_iterator m_current_poller{};
   std::array<uint8_t, 256> m_register_cache{};
   std::array<uint32_t, 256> m_register_cache_time{};
+  uint32_t m_last_register_frame_time{0};
 };
 
 }  // namespace helios_kwl_component

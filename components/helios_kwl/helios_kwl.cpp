@@ -233,7 +233,11 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
     ESP_LOGV(TAG, "Ignoring unrelated DIGIT frame: %s", hex.c_str());
   }
 
-  ESP_LOGW(TAG, "No valid response for register 0x%02X", address);
+  if (m_last_register_frame_time != 0 && millis() - m_last_register_frame_time <= REGISTER_CACHE_TTL_MS) {
+    ESP_LOGD(TAG, "No fresh shared DIGIT value for register 0x%02X", address);
+  } else {
+    ESP_LOGW(TAG, "No valid response for register 0x%02X", address);
+  }
   return {};
 }
 
@@ -369,6 +373,7 @@ bool HeliosKwlComponent::cache_register_value(const Datagram& datagram) {
 
   m_register_cache[datagram[3]] = datagram[4];
   m_register_cache_time[datagram[3]] = millis();
+  m_last_register_frame_time = millis();
   return true;
 }
 
