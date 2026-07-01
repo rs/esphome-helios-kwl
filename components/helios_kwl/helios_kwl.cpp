@@ -172,26 +172,42 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
   flush_read_buffer();
 
   // Write
-  Datagram temp = {0x01, ADDRESS, MAINBOARD, 0x00, address};
-  temp[5] = checksum(temp.cbegin(), temp.cend());
-  write_array(temp);
+  Datagram request = {SYSTEM, ADDRESS, MAINBOARD, 0x00, address};
+  request[5] = checksum(request.cbegin(), request.cend());
+  write_array(request);
   flush();
 
   // Read
-  if (const auto response = read_array<6>()) {
-    const auto& array = *response;
-    if (check_crc(array.cbegin(), array.cend())) {
-      if (array[1] == MAINBOARD && array[2] == ADDRESS && array[3] == address) {
-        return array[4];
-      } else {
-        const auto hex = format_hex_pretty(array.data(), array.size());
-        ESP_LOGE(TAG, "Wrong response from mainboard: %s", hex.c_str());
-      }
-    } else {
-      const auto hex = format_hex_pretty(array.data(), array.size());
-      ESP_LOGE(TAG, "Bad checksum for response: %s", hex.c_str());
+  const uint32_t timeout_ms = 100;
+  const uint32_t start_time = millis();
+  while (millis() - start_time < timeout_ms) {
+    Datagram response{};
+    const uint32_t elapsed_ms = millis() - start_time;
+    if (elapsed_ms >= timeout_ms || !read_datagram(response, timeout_ms - elapsed_ms)) {
+      break;
     }
+
+    const auto hex = format_hex_pretty(response.data(), response.size());
+    if (!check_crc(response.cbegin(), response.cend())) {
+      ESP_LOGV(TAG, "Ignoring DIGIT frame with bad checksum: %s", hex.c_str());
+      continue;
+    }
+
+    // Some RS485 adapters echo TX back to RX; it is not a mainboard response.
+    if (response == request) {
+      ESP_LOGV(TAG, "Ignoring local echo for register 0x%02X: %s", address, hex.c_str());
+      continue;
+    }
+
+    if (response[0] == SYSTEM && response[1] == MAINBOARD && response[2] == ADDRESS && response[3] == address) {
+      return response[4];
+    }
+
+    // Other remotes can share the DIGIT bus, so valid unrelated frames are normal traffic.
+    ESP_LOGV(TAG, "Ignoring unrelated DIGIT frame: %s", hex.c_str());
   }
+
+  ESP_LOGW(TAG, "No valid response for register 0x%02X", address);
   return {};
 }
 
@@ -210,6 +226,30 @@ bool HeliosKwlComponent::set_value(uint8_t address, uint8_t value) {
   } while (read() != temp[5] && retry-- > 0);
 
   return retry >= 0;
+}
+
+bool HeliosKwlComponent::read_datagram(Datagram& datagram, uint32_t timeout_ms) {
+  size_t offset = 0;
+  const uint32_t start_time = millis();
+  while (millis() - start_time < timeout_ms) {
+    while (available()) {
+      const int byte = read();
+      if (byte < 0) {
+        break;
+      }
+
+      if (offset == 0 && byte != SYSTEM) {
+        continue;
+      }
+
+      datagram[offset++] = static_cast<uint8_t>(byte);
+      if (offset == datagram.size()) {
+        return true;
+      }
+    }
+    yield();
+  }
+  return false;
 }
 
 void HeliosKwlComponent::flush_read_buffer() {

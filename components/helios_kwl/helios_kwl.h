@@ -13,6 +13,7 @@ namespace helios_kwl_component {
 
 class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
  private:
+  static constexpr uint8_t SYSTEM = 0x01;
   static constexpr uint8_t ADDRESS = 0x2F;
   static constexpr uint8_t MAINBOARD = 0x11;
   static const int TEMPERATURE[];
@@ -53,6 +54,7 @@ class HeliosKwlComponent : public uart::UARTDevice, public PollingComponent {
 
   bool set_value(uint8_t address, uint8_t value);
 
+  bool read_datagram(Datagram& datagram, uint32_t timeout_ms);
   void flush_read_buffer();
 
   template <typename Iterator>
