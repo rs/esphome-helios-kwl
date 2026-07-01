@@ -171,20 +171,30 @@ optional<uint8_t> HeliosKwlComponent::poll_register(uint8_t address) {
   // Flush read buffer
   flush_read_buffer();
 
-  // Write
   Datagram request = {SYSTEM, ADDRESS, MAINBOARD, 0x00, address};
   request[5] = checksum(request.cbegin(), request.cend());
-  write_array(request);
-  flush();
 
-  // Read
   const uint32_t timeout_ms = 100;
+  const uint32_t request_retry_ms = 10;
   const uint32_t start_time = millis();
+  uint32_t last_request_time = start_time - request_retry_ms;
   while (millis() - start_time < timeout_ms) {
+    if (millis() - last_request_time >= request_retry_ms) {
+      // DIGIT requesters retry after 10 ms; this also helps on a shared bus if the first request collides.
+      write_array(request);
+      flush();
+      last_request_time = millis();
+    }
+
     Datagram response{};
     const uint32_t elapsed_ms = millis() - start_time;
-    if (elapsed_ms >= timeout_ms || !read_datagram(response, timeout_ms - elapsed_ms)) {
-      break;
+    if (elapsed_ms >= timeout_ms) {
+      continue;
+    }
+    const uint32_t remaining_ms = timeout_ms - elapsed_ms;
+    const uint32_t wait_ms = remaining_ms < request_retry_ms ? remaining_ms : request_retry_ms;
+    if (!read_datagram(response, wait_ms)) {
+      continue;
     }
 
     const auto hex = format_hex_pretty(response.data(), response.size());
